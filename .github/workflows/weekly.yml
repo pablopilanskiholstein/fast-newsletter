@@ -1,0 +1,50 @@
+name: FAST Weekly Newsletter
+
+on:
+  schedule:
+    # 07:00 UTC lunes = 09:00 Madrid (CEST) / 08:00 invierno
+    - cron: '0 7 * * 1'
+  workflow_dispatch:
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build weekly newsletter
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: node build_newsletter.mjs weekly
+
+      - name: Send via Gmail API
+        env:
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_FROM: ${{ secrets.GMAIL_FROM }}
+        run: |
+          node send_newsletter.mjs \
+            --to "pablo.pilanski@qformedia.com" \
+            --subject "$(cat /tmp/subject.txt)" \
+            --html-file /tmp/body.html
+
+      - name: Commit updated history
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add history.json
+          git diff --cached --quiet || git commit -m "history: $(date -u +%Y-%m-%d) weekly"
+          git push
