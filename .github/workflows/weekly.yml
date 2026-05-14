@@ -37,7 +37,7 @@ jobs:
           GMAIL_FROM: ${{ secrets.GMAIL_FROM }}
         run: |
           node send_newsletter.mjs \
-            --to "pablo.pilanski@qformedia.com" \
+            --to "pablo.pilanski@qformedia.com,quim.campa@qformedia.com,robin.valero@qformedia.com,albert.merino@qformedia.com" \
             --subject "$(cat /tmp/subject.txt)" \
             --html-file /tmp/body.html
 

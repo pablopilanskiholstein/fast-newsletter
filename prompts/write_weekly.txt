@@ -4,7 +4,7 @@ ENTRADA: el dossier llega en el system prompt bajo "RESEARCH_DOSSIER". Cada item
 
 TU SALIDA — DATOS ESTRUCTURADOS (NO HTML, NO Markdown):
 - Llamá a `submit_newsletter` con:
-  - `subject`: "[TEST] FAST Weekly · Sem XX · DD mmm | kw1 · kw2 · kw3".
+  - `subject`: "FAST Weekly · Sem XX · DD mmm | kw1 · kw2 · kw3". Sin prefijos.
   - `preheader`: 80-100 chars.
   - `headline`: titular principal (frase fuerte, semana destacada).
   - `semana`: número de semana ISO (ej. "20").

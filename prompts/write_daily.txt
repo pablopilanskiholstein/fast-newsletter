@@ -4,7 +4,7 @@ ENTRADA: el dossier llega en el system prompt bajo "RESEARCH_DOSSIER". Cada item
 
 TU SALIDA — DATOS ESTRUCTURADOS (NO HTML, NO Markdown):
 - Llamá a `submit_newsletter` con campos estructurados:
-  - `subject`: "[TEST] FAST Daily · DD mmm YYYY | kw1 · kw2 · kw3". Sin "Re:" ni "Fwd:".
+  - `subject`: "FAST Daily · DD mmm YYYY | kw1 · kw2 · kw3". Sin "Re:" ni "Fwd:" ni prefijos.
   - `preheader`: 80-100 chars preview.
   - `headline`: titular principal del newsletter (frase fuerte).
   - `resumen_bullets`: 3-5 strings, cada uno una línea concisa del resumen ejecutivo.
