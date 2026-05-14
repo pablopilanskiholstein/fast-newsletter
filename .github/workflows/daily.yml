@@ -1,0 +1,52 @@
+name: FAST Daily Newsletter
+
+on:
+  schedule:
+    # 06:00 UTC = 08:00 Madrid (CEST verano) / 07:00 invierno
+    # Cron de GitHub Actions es UTC. Si querés ajustar al horario CET/CEST exacto
+    # tendrías que duplicar el cron o aceptar que en invierno llegue a las 07:00.
+    - cron: '0 6 * * 1-5'
+  workflow_dispatch:  # permite trigger manual desde la UI de Actions
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # para commit del history.json actualizado
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build newsletter (Claude API + web_search)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: node build_newsletter.mjs daily
+
+      - name: Send via Gmail API
+        env:
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_FROM: ${{ secrets.GMAIL_FROM }}
+        run: |
+          node send_newsletter.mjs \
+            --to "pablo.pilanski@qformedia.com" \
+            --subject "$(cat /tmp/subject.txt)" \
+            --html-file /tmp/body.html
+
+      - name: Commit updated history
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add history.json
+          git diff --cached --quiet || git commit -m "history: $(date -u +%Y-%m-%d) daily"
+          git push

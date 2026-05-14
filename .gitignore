@@ -1,0 +1,30 @@
+node_modules/
+.DS_Store
+*.log
+
+# Archivos temporales de generación
+/tmp/
+
+# Outputs locales / previews
+preview_*.html
+logo_test.html
+
+# Scripts de setup ya usados (los borramos del repo, viven en local si querés referencia)
+get_refresh_token.mjs
+smoke_test.mjs
+test_api_key.mjs
+
+# Artefactos era Codex anterior (no son parte del pipeline actual)
+automation_outputs/
+fast_cover_control_*.png
+fast_cover_control_*.svg
+fast_cover_control_*.svg.png
+render_cover.js
+
+# Referencias de diseño locales (no necesarias en repo)
+*.pdf
+preview_*.html
+
+# Secretos que nunca deberían commitearse
+.env
+*.json.secret

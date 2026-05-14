@@ -1,0 +1,19 @@
+{
+  "name": "newsletter_fast",
+  "version": "1.0.0",
+  "description": "",
+  "main": "render_cover.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.96.0",
+    "googleapis": "^171.4.0",
+    "nodemailer": "^8.0.7",
+    "playwright": "^1.59.1"
+  }
+}
