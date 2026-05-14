@@ -138,16 +138,26 @@ while (!submission && iterations < MAX_ITERATIONS) {
   if (res.stop_reason === "tool_use") {
     const toolResults = [];
     for (const block of res.content) {
+      // Server tools (web_search) llegan como type "server_tool_use" y se auto-resuelven; los ignoramos.
       if (block.type !== "tool_use") continue;
+      // Cliente tools (las que registré en `tools` con campos input_schema, no las "server_tool" como web_search)
       if (block.name === "submit_newsletter") {
         submission = block.input;
         toolResults.push({ type: "tool_result", tool_use_id: block.id, content: "Newsletter recibido. Gracias." });
-      } else if (block.name === "web_search") {
-        // server tool — Anthropic la resuelve automáticamente, no requiere tool_result del cliente
-        continue;
+      } else {
+        // Defensivo: cualquier otro tool_use cliente desconocido recibe un noop para no dejar huérfanos.
+        console.error(`  ⚠ tool_use desconocido (${block.name}, id=${block.id}). Respondo noop.`);
+        toolResults.push({ type: "tool_result", tool_use_id: block.id, content: "OK" });
       }
     }
-    if (toolResults.length) {
+    if (toolResults.length === 0) {
+      // No hubo tool_use cliente en esta iteración (solo server tools). Algo raro porque stop_reason era tool_use.
+      // Diagnóstico:
+      const blockTypes = res.content.map((b) => `${b.type}${b.name ? `(${b.name})` : ""}`).join(", ");
+      console.error(`  Iteración ${iterations}: stop_reason=tool_use pero no hubo tool_use cliente. Blocks: ${blockTypes}`);
+      // Forzamos al modelo a continuar pidiéndole explícitamente que llame a submit_newsletter
+      messages.push({ role: "user", content: "Continúa con la investigación si te faltan datos, o llama YA a submit_newsletter con el newsletter completo." });
+    } else {
       messages.push({ role: "user", content: toolResults });
     }
   }
