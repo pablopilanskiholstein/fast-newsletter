@@ -41,20 +41,14 @@ INSTRUCCIÓN ESPECIAL — Pieza destacada si está vigente esta semana:
 - Enfoque: impacto en operaciones FAST/CTV y monetización.
 - Incluir como noticia destacada si sigue siendo noticia esta semana; si ya no, otra pieza fuerte ocupa el bloque destacado.
 
-FORMATO HTML:
-- Sigue EXACTAMENTE la estructura visual del template_weekly.html: barra superior #E63329, header con kicker letter-spaced, bloque ES completo (RESUMEN EJECUTIVO + NOTICIA DESTACADA + bloques temáticos + SEÑALES A VIGILAR) seguido del bloque CAT con la misma estructura traducida, footer bilingüe con logo Quantum Makers vía cid:qm-logo.
-- Bloques temáticos (etiquetas tipo "PLATAFORMA", "EUROPA", "ADTECH", "MONETIZACIÓN", "DATOS & MERCADO"). 3-5 bullets por bloque con titular + bullets + fuentes enlazadas.
-- Paleta: tinta #1a1a1a, rojo principal #E63329, rojo profundo #C2231C, separadores #e8e3e0, fondo #f4efec.
-- Tipografía: Georgia para titulares, sans-serif system para cuerpo.
-- Inline CSS (Gmail strips <style>).
-- Sin imágenes externas. SOLO el logo Quantum Makers vía CID.
-- Width 640px wrapper, role="presentation".
-- Kickers limpios sin espacios manuales (CSS letter-spacing lo aplica).
-
-CUANDO TERMINES:
-- Llama a la tool `submit_newsletter` con:
-  - `subject`: "FAST Weekly · Sem XX · DD mmm | kw1 · kw2 · kw3". Empezar con [TEST] durante fase de pruebas. Sin "Re:", sin "Fwd:".
-  - `preheader`: 80-100 chars con resumen de la semana.
-  - `html`: HTML completo bilingüe.
-  - `formacion_bullets`: opcional para el weekly, podés pasarlo vacío [] o con los bullets de formación si los hubo.
-  - `sources_used`: array de URLs principales consultadas.
+SALIDA — DATOS ESTRUCTURADOS (NO HTML):
+- NO escribas HTML. El HTML lo renderiza el código local desde los datos que devuelves.
+- Llama a la tool `submit_newsletter` con datos estructurados:
+  - `subject`: "[TEST] FAST Weekly · Sem XX · DD mmm | kw1 · kw2 · kw3".
+  - `preheader`: 80-100 chars.
+  - `headline`: titular principal de la semana.
+  - `semana`: número de semana ISO (ej. "20").
+  - `es`: bloque español con `{ resumen, destacada: { titular, subtitulo, cuerpo }, bloques, senales_bullets }`.
+  - `cat`: bloque catalán con la misma estructura, contenido traducido.
+- Estructura de cada `bloque` (dentro de `es.bloques` y `cat.bloques`): `{ etiqueta, titular, bullets }` donde bullets son `{ texto, fuente_url, fuente_nombre }`.
+- IMPORTANTE: el separador catalán y la regla anti-bandera-incorrecta NO aplican aquí porque tú no escribes HTML — el renderer local pone el separador "CAT · EDICIÓ EN CATALÀ" automáticamente. Solo te ocupás del contenido editorial bilingüe.

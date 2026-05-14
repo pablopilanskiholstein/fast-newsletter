@@ -46,21 +46,18 @@ CRITERIO EDITORIAL GENERAL:
 - Si un dato es rumor o estimación, etiquétalo explícitamente.
 - No inventes datos. Cada noticia relevante debe llevar fuente enlazada.
 
-FORMATO HTML:
-- Sigue EXACTAMENTE la estructura visual del archivo template_daily.html: barra superior #E63329, header con kicker letter-spaced, RESUMEN EJECUTIVO, bloques temáticos con etiqueta (PLATAFORMA, ADTECH, EUROPA, LATAM, DATOS & MERCADO), SEÑALES A VIGILAR, FORMACIÓN & NETWORKING, footer con logo Quantum Makers vía cid:qm-logo.
-- Paleta: tinta #1a1a1a, rojo principal #E63329, rojo profundo #C2231C, separadores #e8e3e0, fondo #f4efec.
-- Tipografía: Georgia para titulares, sans-serif system para cuerpo.
-- Inline CSS (Gmail strips <style>).
-- Sin imágenes externas. SOLO el logo Quantum Makers vía CID.
-- Width 640px wrapper, role="presentation".
-- Texto de los kickers limpio sin espacios manuales (CSS letter-spacing lo aplica): "RESUMEN EJECUTIVO", "SEÑALES A VIGILAR", "PLATAFORMA", etc.
+SALIDA — DATOS ESTRUCTURADOS (NO HTML):
+- NO escribas HTML. El HTML lo renderiza el código local desde los datos que devuelves.
+- Llama a la tool `submit_newsletter` con datos estructurados:
+  - `subject`: asunto con prefijo "[TEST] " durante pruebas + fecha + 2-3 keywords.
+  - `preheader`: preview 80-100 chars.
+  - `headline`: titular principal del newsletter.
+  - `resumen_bullets`: 3-5 strings, cada uno una línea del resumen ejecutivo.
+  - `bloques`: array de bloques temáticos. Cada bloque: `{ etiqueta, titular, bullets }` donde:
+    - `etiqueta`: kicker MAYÚSCULA (ej. "PLATAFORMA", "ADTECH", "EUROPA", "LATAM", "DATOS & MERCADO").
+    - `titular`: una frase resumen del bloque.
+    - `bullets`: array de 3-5 noticias. Cada noticia: `{ texto, fuente_url, fuente_nombre }`. Texto editorial 2-4 líneas. Fuente con URL y nombre breve del medio.
+  - `senales_bullets`: 3-5 strings, "Señales a vigilar".
+  - `formacion_bullets`: 2-4 oportunidades. Cada una: `{ nombre, lugar, fecha, url }`. `nombre` es el identificador consistente para tracking anti-repetición.
 
-CUANDO TERMINES:
-- Llama a la tool `submit_newsletter` con:
-  - `subject`: asunto del email (incluir fecha y 2-3 keywords). Sin "Re:", sin "Fwd:". Empezar con prefijo "[TEST] " durante fase de pruebas.
-  - `preheader`: 80-100 chars con titulares de la jornada (texto preview en clientes de email).
-  - `html`: HTML completo del email siguiendo el template.
-  - `formacion_bullets`: array con identificadores de las oportunidades que incluiste en FORMACIÓN & NETWORKING (ej: ["NAB Show NY 2026", "Curso LSE Programming FAST"]). Esto se guarda en history.json para la regla anti-repetición.
-  - `sources_used`: array de URLs principales consultadas. Útil para auditoría.
-
-Si no encuentras noticias relevantes en las últimas 24h, llama igualmente a submit_newsletter con un newsletter breve indicando que el día no presentó movimientos significativos + tendencias en curso + sección FORMACIÓN obligatoria.
+Si no encuentras noticias relevantes en las últimas 24h, devuelve igualmente datos con bloques mínimos indicando que el día no presentó movimientos + tendencias en curso + formacion_bullets siempre presente.
