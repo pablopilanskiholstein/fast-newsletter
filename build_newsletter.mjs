@@ -251,7 +251,8 @@ const startStep2 = Date.now();
 
 const writeRes = await anthropic.messages.create({
   model: "claude-haiku-4-5",
-  max_tokens: editionType === "weekly" ? 12000 : 6000,
+  // max_tokens NO cuesta plata, solo lo que se genera. Margen amplio para evitar truncamiento.
+  max_tokens: editionType === "weekly" ? 16000 : 6000,
   system: [{ type: "text", text: writeSystem }],
   tools: writeTools,
   tool_choice: { type: "any" },
