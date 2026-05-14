@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// Genera el HTML del FAST Newsletter:
-// 1) Pide a Claude API solo DATOS ESTRUCTURADOS (no HTML) → bajísimo output → ~$0.05/run
-// 2) Renderiza el HTML localmente en render.mjs desde esos datos + diseño Quantum Makers
-// 3) Actualiza history.json con bullets de FORMACIÓN
+// FAST Newsletter — pipeline en 2 pasos:
+//   Step 1 (Sonnet 4.6 + web_search): investigación → dossier estructurado de hechos crudos.
+//   Step 2 (Haiku 4.5, sin tools): redacción editorial → datos estructurados del newsletter.
+//   Step 3 (local): renderiza HTML desde los datos + template Quantum Makers.
 //
-// Output: /tmp/body.html, /tmp/subject.txt, /tmp/preheader.txt, /tmp/data.json
+// Output: /tmp/body.html, /tmp/subject.txt, /tmp/preheader.txt, /tmp/data.json, /tmp/dossier.json
 //
 // Uso:  node build_newsletter.mjs [daily|weekly]
 // Env requeridas: ANTHROPIC_API_KEY
@@ -23,8 +23,10 @@ if (!process.env.ANTHROPIC_API_KEY) {
   process.exit(2);
 }
 
-const promptPath = path.join(__dirname, "prompts", `${editionType}.txt`);
-const basePrompt = fs.readFileSync(promptPath, "utf8");
+const researchPromptPath = path.join(__dirname, "prompts", `research_${editionType}.txt`);
+const writePromptPath = path.join(__dirname, "prompts", `write_${editionType}.txt`);
+const researchPrompt = fs.readFileSync(researchPromptPath, "utf8");
+const writePrompt = fs.readFileSync(writePromptPath, "utf8");
 
 const historyPath = path.join(__dirname, "history.json");
 const history = fs.existsSync(historyPath)
@@ -41,13 +43,123 @@ const recientes = Object.entries(counts).filter(([, c]) => c < 3).map(([b, c]) =
 const today = new Date().toISOString().slice(0, 10);
 const todayLong = new Date().toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
-// Schemas estructurados — el modelo NO produce HTML, solo datos.
+const anthropic = new Anthropic();
+
+// ============================================================
+// STEP 1 — Investigación (Sonnet 4.6 + web_search)
+// ============================================================
+
+const researchTools = [
+  { type: "web_search_20250305", name: "web_search", max_uses: 2 },
+  {
+    name: "submit_research",
+    description: "Devuelve el dossier de investigación estructurado, sin redacción editorial.",
+    input_schema: {
+      type: "object",
+      properties: {
+        items: {
+          type: "array",
+          description: "Hechos crudos encontrados, agrupados por tópico/categoría.",
+          items: {
+            type: "object",
+            properties: {
+              topico: { type: "string", description: "Tópico/categoría (ej. 'Plataforma', 'AdTech', 'LATAM')." },
+              destacada: { type: "boolean", description: "true si esta pieza debería ser la noticia destacada (weekly)." },
+              hechos: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    titulo_corto: { type: "string", description: "Título corto del hecho (no editorial, solo descriptivo)." },
+                    dato_clave: { type: "string", description: "Dato clave o cifra concreta del hecho." },
+                    fuente_url: { type: "string" },
+                    fuente_nombre: { type: "string" },
+                    fecha_publicacion: { type: "string", description: "YYYY-MM-DD si la verificaste." },
+                    es_rumor: { type: "boolean", description: "true si es rumor/estimación sin confirmar." },
+                  },
+                  required: ["titulo_corto", "dato_clave", "fuente_url", "fuente_nombre"],
+                },
+              },
+            },
+            required: ["topico", "hechos"],
+          },
+        },
+        formacion: {
+          type: "array",
+          description: "Oportunidades de formación/networking encontradas (solo daily; weekly puede ser []).",
+          items: {
+            type: "object",
+            properties: {
+              nombre: { type: "string" },
+              lugar: { type: "string" },
+              fecha: { type: "string" },
+              url: { type: "string" },
+            },
+            required: ["nombre"],
+          },
+        },
+      },
+      required: ["items", "formacion"],
+    },
+  },
+];
+
+const researchSystem = `${researchPrompt}
+
+---
+CONTEXTO DE EJECUCIÓN:
+- Fecha hoy: ${todayLong} (${today})
+- Edición: ${editionType.toUpperCase()}
+
+FORMACION_VETADOS (NO incluir):
+${vetados.length ? vetados.map((s) => `  - ${s}`).join("\n") : "  (ninguno)"}
+
+FORMACION_HISTORIAL_RECIENTE (info, no es bloqueo):
+${recientes.length ? recientes.map((s) => `  - ${s}`).join("\n") : "  (sin historial)"}`;
+
+console.log(`→ Step 1: investigación con Sonnet 4.6 + web_search (max_uses: 2)...`);
+const startStep1 = Date.now();
+
+const researchRes = await anthropic.messages.create({
+  model: "claude-sonnet-4-6",
+  max_tokens: 4000,
+  system: [{ type: "text", text: researchSystem, cache_control: { type: "ephemeral" } }],
+  tools: researchTools,
+  tool_choice: { type: "any" },
+  messages: [
+    { role: "user", content: `Investigá noticias FAST/CTV/AVOD de ${editionType === "daily" ? "las últimas 24h" : "los últimos 7 días"}. Llamá a submit_research con los hechos crudos y fuentes verificadas.` },
+  ],
+});
+
+console.log(`  stop_reason: ${researchRes.stop_reason}`);
+console.log(`  blocks: ${researchRes.content.map((b) => `${b.type}${b.name ? `(${b.name})` : ""}`).join(", ")}`);
+console.log(`  tokens: input ${researchRes.usage.input_tokens}, output ${researchRes.usage.output_tokens}, cache_read ${researchRes.usage.cache_read_input_tokens ?? 0}`);
+
+let dossier = null;
+for (const block of researchRes.content) {
+  if (block.type === "tool_use" && block.name === "submit_research") {
+    dossier = block.input;
+    break;
+  }
+}
+if (!dossier) {
+  console.error("Step 1: no llegó submit_research.");
+  process.exit(1);
+}
+fs.writeFileSync("/tmp/dossier.json", JSON.stringify(dossier, null, 2));
+console.log(`  ✓ Dossier: ${dossier.items.length} items, ${dossier.formacion?.length ?? 0} formación`);
+console.log(`  Step 1 tiempo: ${Math.round((Date.now() - startStep1) / 1000)}s`);
+
+// ============================================================
+// STEP 2 — Redacción editorial (Haiku 4.5, sin tools)
+// ============================================================
+
 const bulletItemSchema = {
   type: "object",
   properties: {
-    texto: { type: "string", description: "Texto de la noticia, 2-4 líneas." },
-    fuente_url: { type: "string", description: "URL del artículo fuente." },
-    fuente_nombre: { type: "string", description: "Nombre breve del medio (ej. 'Variety', 'AdExchanger')." },
+    texto: { type: "string" },
+    fuente_url: { type: "string" },
+    fuente_nombre: { type: "string" },
   },
   required: ["texto"],
 };
@@ -55,9 +167,9 @@ const bulletItemSchema = {
 const bloqueSchema = {
   type: "object",
   properties: {
-    etiqueta: { type: "string", description: "Kicker en MAYÚSCULAS (ej. 'PLATAFORMA', 'ADTECH', 'LATAM')." },
-    titular: { type: "string", description: "Titular del bloque, una frase." },
-    bullets: { type: "array", items: bulletItemSchema, description: "3-5 bullets de noticias." },
+    etiqueta: { type: "string" },
+    titular: { type: "string" },
+    bullets: { type: "array", items: bulletItemSchema },
   },
   required: ["etiqueta", "titular", "bullets"],
 };
@@ -65,24 +177,24 @@ const bloqueSchema = {
 const formacionItemSchema = {
   type: "object",
   properties: {
-    nombre: { type: "string", description: "Nombre del evento/curso/beca. Identificador consistente para tracking anti-repetición." },
-    lugar: { type: "string", description: "Lugar o formato (ej. 'Madrid', 'Online', 'Londres')." },
-    fecha: { type: "string", description: "Fechas o plazo (ej. '10-12 jun', 'Plazo: 30 jun')." },
-    url: { type: "string", description: "URL del evento/curso." },
+    nombre: { type: "string" },
+    lugar: { type: "string" },
+    fecha: { type: "string" },
+    url: { type: "string" },
   },
   required: ["nombre"],
 };
 
-const dailySchema = {
+const dailyOutputSchema = {
   type: "object",
   properties: {
-    subject: { type: "string", description: "Asunto del email con prefijo [TEST] durante pruebas. Incluye fecha + 2-3 keywords." },
-    preheader: { type: "string", description: "Preview 80-100 chars." },
-    headline: { type: "string", description: "Titular principal del newsletter." },
-    resumen_bullets: { type: "array", items: { type: "string" }, description: "3-5 bullets de resumen ejecutivo." },
-    bloques: { type: "array", items: bloqueSchema, description: "Bloques temáticos (PLATAFORMA, ADTECH, etc.)." },
-    senales_bullets: { type: "array", items: { type: "string" }, description: "3-5 señales a vigilar." },
-    formacion_bullets: { type: "array", items: formacionItemSchema, description: "2-4 oportunidades de formación/networking. Respetar regla anti-repetición." },
+    subject: { type: "string" },
+    preheader: { type: "string" },
+    headline: { type: "string" },
+    resumen_bullets: { type: "array", items: { type: "string" } },
+    bloques: { type: "array", items: bloqueSchema },
+    senales_bullets: { type: "array", items: { type: "string" } },
+    formacion_bullets: { type: "array", items: formacionItemSchema },
   },
   required: ["subject", "preheader", "headline", "resumen_bullets", "bloques", "senales_bullets", "formacion_bullets"],
 };
@@ -90,14 +202,10 @@ const dailySchema = {
 const langBlockSchema = {
   type: "object",
   properties: {
-    resumen: { type: "string", description: "Resumen ejecutivo, párrafo de 4-6 líneas." },
+    resumen: { type: "string" },
     destacada: {
       type: "object",
-      properties: {
-        titular: { type: "string" },
-        subtitulo: { type: "string" },
-        cuerpo: { type: "string", description: "Cuerpo de la noticia destacada." },
-      },
+      properties: { titular: { type: "string" }, subtitulo: { type: "string" }, cuerpo: { type: "string" } },
     },
     bloques: { type: "array", items: bloqueSchema },
     senales_bullets: { type: "array", items: { type: "string" } },
@@ -105,83 +213,66 @@ const langBlockSchema = {
   required: ["resumen", "destacada", "bloques", "senales_bullets"],
 };
 
-const weeklySchema = {
+const weeklyOutputSchema = {
   type: "object",
   properties: {
     subject: { type: "string" },
     preheader: { type: "string" },
     headline: { type: "string" },
-    semana: { type: "string", description: "Número de semana ISO (ej. '20')." },
+    semana: { type: "string" },
     es: langBlockSchema,
     cat: langBlockSchema,
   },
   required: ["subject", "preheader", "headline", "semana", "es", "cat"],
 };
 
-const tools = [
-  { type: "web_search_20250305", name: "web_search", max_uses: 2 },
+const writeTools = [
   {
     name: "submit_newsletter",
-    description: "Envía el newsletter como datos estructurados. El HTML se renderiza localmente desde estos datos.",
-    input_schema: editionType === "daily" ? dailySchema : weeklySchema,
+    description: "Devuelve el contenido editorial estructurado del newsletter. NO HTML, solo datos.",
+    input_schema: editionType === "daily" ? dailyOutputSchema : weeklyOutputSchema,
   },
 ];
 
-const systemPrompt = `${basePrompt}
+const writeSystem = `${writePrompt}
 
 ---
-CONTEXTO DE EJECUCIÓN:
-- Fecha de hoy: ${todayLong} (${today})
+CONTEXTO:
+- Fecha hoy: ${todayLong} (${today})
 - Edición: ${editionType.toUpperCase()}
 
-FORMACION_HISTORY (bullets usados últimos 7 días):
-${recientes.length ? recientes.map((s) => `  - ${s}`).join("\n") : "  (sin historial reciente)"}
+RESEARCH_DOSSIER (hechos crudos verificados que debes usar; NO inventes lo que no esté aquí):
+\`\`\`json
+${JSON.stringify(dossier, null, 2)}
+\`\`\``;
 
-FORMACION_VETADOS (NO incluir):
-${vetados.length ? vetados.map((s) => `  - ${s}`).join("\n") : "  (ninguno vetado)"}
+console.log(`→ Step 2: redacción con Haiku 4.5...`);
+const startStep2 = Date.now();
 
----
-NUEVA ARQUITECTURA — IMPORTANTE:
-- NO escribas HTML. NO uses placeholders {{...}}. NO copies el template_${editionType}.html.
-- Devuelve SOLO los datos estructurados en submit_newsletter. El HTML se construye localmente.
-- Maquetación, paleta, tipografía, logo: están en el renderer local. No te ocupes.
-- Tu trabajo: investigar con web_search + redactar contenido editorial + estructurar datos.
-- Cada bullet/noticia: texto editorial + fuente_url + fuente_nombre. Sin HTML.
-`;
-
-const anthropic = new Anthropic();
-
-console.log(`→ Generando ${editionType} para ${todayLong}...`);
-console.log(`  Vetados FORMACIÓN: ${vetados.length}`);
-
-const startTime = Date.now();
-
-const res = await anthropic.messages.create({
-  model: "claude-sonnet-4-6",
-  max_tokens: 8000, // ahora basta porque output es solo JSON estructurado
-  system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }],
-  tools,
+const writeRes = await anthropic.messages.create({
+  model: "claude-haiku-4-5",
+  max_tokens: editionType === "weekly" ? 12000 : 6000,
+  system: [{ type: "text", text: writeSystem }],
+  tools: writeTools,
   tool_choice: { type: "any" },
   messages: [
-    { role: "user", content: `Investiga noticias del sector FAST/CTV/AVOD de las últimas ${editionType === "daily" ? "24 horas" : "7 días"} con web_search y luego llama a submit_newsletter con los datos estructurados. NO escribas HTML, solo datos.` },
+    { role: "user", content: "Usá el dossier del system prompt para producir el newsletter estructurado. Llamá a submit_newsletter." },
   ],
 });
 
-console.log(`  stop_reason: ${res.stop_reason}`);
-console.log(`  blocks: ${res.content.map((b) => `${b.type}${b.name ? `(${b.name})` : ""}`).join(", ")}`);
-console.log(`  tokens: input ${res.usage.input_tokens}, output ${res.usage.output_tokens}, cache_read ${res.usage.cache_read_input_tokens ?? 0}`);
+console.log(`  stop_reason: ${writeRes.stop_reason}`);
+console.log(`  blocks: ${writeRes.content.map((b) => `${b.type}${b.name ? `(${b.name})` : ""}`).join(", ")}`);
+console.log(`  tokens: input ${writeRes.usage.input_tokens}, output ${writeRes.usage.output_tokens}, cache_read ${writeRes.usage.cache_read_input_tokens ?? 0}`);
 
 let data = null;
-for (const block of res.content) {
+for (const block of writeRes.content) {
   if (block.type === "tool_use" && block.name === "submit_newsletter") {
     data = block.input;
     break;
   }
 }
-
 if (!data) {
-  console.error("No llegó submit_newsletter. Texto del modelo:");
-  console.error(res.content.find((b) => b.type === "text")?.text?.slice(0, 1000) || "(sin texto)");
+  console.error("Step 2: no llegó submit_newsletter.");
   process.exit(1);
 }
 
@@ -189,31 +280,30 @@ if (!data) {
 const requiredTop = editionType === "daily"
   ? ["subject", "preheader", "headline", "resumen_bullets", "bloques", "senales_bullets", "formacion_bullets"]
   : ["subject", "preheader", "headline", "semana", "es", "cat"];
-
 for (const field of requiredTop) {
   if (data[field] === undefined || data[field] === null) {
-    console.error(`❌ Campo obligatorio faltante: ${field}. stop_reason=${res.stop_reason}.`);
+    console.error(`❌ Campo obligatorio faltante: ${field}. stop_reason=${writeRes.stop_reason}.`);
     process.exit(1);
   }
 }
 
-// Render HTML local
+console.log(`  Step 2 tiempo: ${Math.round((Date.now() - startStep2) / 1000)}s`);
+
+// ============================================================
+// STEP 3 — Render HTML local + outputs
+// ============================================================
+
 const html = editionType === "daily"
   ? renderDaily({ ...data, fecha_larga: todayLong })
   : renderWeekly({ ...data, fecha_larga: todayLong });
 
-const elapsedSec = Math.round((Date.now() - startTime) / 1000);
-console.log(`✓ Newsletter generado en ${elapsedSec}s.`);
-console.log(`  Subject: ${data.subject}`);
-console.log(`  HTML renderizado: ${html.length} chars`);
+console.log(`✓ HTML renderizado: ${html.length} chars`);
 
-// Outputs
 fs.writeFileSync("/tmp/body.html", html);
 fs.writeFileSync("/tmp/subject.txt", data.subject);
 fs.writeFileSync("/tmp/preheader.txt", data.preheader);
 fs.writeFileSync("/tmp/data.json", JSON.stringify(data, null, 2));
 
-// Update history (solo para daily; weekly no aplica anti-repetición FORMACIÓN aquí)
 if (editionType === "daily" && Array.isArray(data.formacion_bullets)) {
   const bulletNames = data.formacion_bullets.map((b) => b.nombre).filter(Boolean);
   history.formacion.push({ date: today, bullets: bulletNames });
@@ -222,3 +312,5 @@ if (editionType === "daily" && Array.isArray(data.formacion_bullets)) {
   fs.writeFileSync(historyPath, JSON.stringify(history, null, 2));
   console.log(`  history.json actualizado con ${bulletNames.length} bullets.`);
 }
+
+console.log(`✓ Subject: ${data.subject}`);
