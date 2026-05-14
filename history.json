@@ -1,3 +1,13 @@
 {
-  "formacion": []
+  "formacion": [
+    {
+      "date": "2026-05-14",
+      "bullets": [
+        "CTV OTT Streaming Summit 2026 Londres",
+        "Rakuten TV Enterprise Live London",
+        "Programmatic Pioneers Summit 2026",
+        "DMEXCO 2026"
+      ]
+    }
+  ]
 }
