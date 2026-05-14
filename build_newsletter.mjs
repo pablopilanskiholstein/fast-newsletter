@@ -103,73 +103,45 @@ const anthropic = new Anthropic();
 console.log(`→ Generando ${editionType} newsletter para ${todayLong}...`);
 console.log(`  Vetados FORMACIÓN: ${vetados.length}`);
 
-let messages = [
-  { role: "user", content: "Genera el newsletter siguiendo las instrucciones del system prompt. Investiga con web_search primero, luego llama a submit_newsletter." },
-];
-
-let submission = null;
 const startTime = Date.now();
-let iterations = 0;
-const MAX_ITERATIONS = 20;
 
-while (!submission && iterations < MAX_ITERATIONS) {
-  iterations++;
-  const res = await anthropic.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 16000,
-    // Prompt caching: el system prompt es grande y se reutiliza en cada iteración del tool-use loop.
-    // Marcar con cache_control reduce ~90% del coste de input en las iteraciones tras la primera.
-    system: [
-      { type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } },
-    ],
-    tools,
-    messages,
-  });
+// Una sola llamada: web_search es server-side (se resuelve dentro de la response),
+// el modelo investiga y llama a submit_newsletter al final, todo en una respuesta.
+const res = await anthropic.messages.create({
+  model: "claude-sonnet-4-6",
+  max_tokens: 16000,
+  system: [
+    { type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } },
+  ],
+  tools,
+  // Forzamos al modelo a terminar llamando a submit_newsletter (no puede acabar sin él).
+  tool_choice: { type: "any" },
+  messages: [
+    { role: "user", content: "Investiga con web_search y luego llama a submit_newsletter con el newsletter completo. No respondas con texto plano, solo herramientas." },
+  ],
+});
 
-  messages.push({ role: "assistant", content: res.content });
+console.log(`  stop_reason: ${res.stop_reason}`);
+console.log(`  blocks: ${res.content.map((b) => `${b.type}${b.name ? `(${b.name})` : ""}`).join(", ")}`);
+console.log(`  tokens: input ${res.usage.input_tokens}, output ${res.usage.output_tokens}, cache_read ${res.usage.cache_read_input_tokens ?? 0}`);
 
-  if (res.stop_reason === "end_turn") {
-    console.error("Claude terminó sin llamar a submit_newsletter. Última respuesta:");
-    const txt = res.content.find((b) => b.type === "text")?.text || "";
-    console.error(txt.slice(0, 1000));
-    process.exit(1);
-  }
-
-  if (res.stop_reason === "tool_use") {
-    const toolResults = [];
-    for (const block of res.content) {
-      // Server tools (web_search) llegan como type "server_tool_use" y se auto-resuelven; los ignoramos.
-      if (block.type !== "tool_use") continue;
-      // Cliente tools (las que registré en `tools` con campos input_schema, no las "server_tool" como web_search)
-      if (block.name === "submit_newsletter") {
-        submission = block.input;
-        toolResults.push({ type: "tool_result", tool_use_id: block.id, content: "Newsletter recibido. Gracias." });
-      } else {
-        // Defensivo: cualquier otro tool_use cliente desconocido recibe un noop para no dejar huérfanos.
-        console.error(`  ⚠ tool_use desconocido (${block.name}, id=${block.id}). Respondo noop.`);
-        toolResults.push({ type: "tool_result", tool_use_id: block.id, content: "OK" });
-      }
-    }
-    if (toolResults.length === 0) {
-      // No hubo tool_use cliente en esta iteración (solo server tools). Algo raro porque stop_reason era tool_use.
-      // Diagnóstico:
-      const blockTypes = res.content.map((b) => `${b.type}${b.name ? `(${b.name})` : ""}`).join(", ");
-      console.error(`  Iteración ${iterations}: stop_reason=tool_use pero no hubo tool_use cliente. Blocks: ${blockTypes}`);
-      // Forzamos al modelo a continuar pidiéndole explícitamente que llame a submit_newsletter
-      messages.push({ role: "user", content: "Continúa con la investigación si te faltan datos, o llama YA a submit_newsletter con el newsletter completo." });
-    } else {
-      messages.push({ role: "user", content: toolResults });
-    }
+// Extrae el tool_use de submit_newsletter
+let submission = null;
+for (const block of res.content) {
+  if (block.type === "tool_use" && block.name === "submit_newsletter") {
+    submission = block.input;
+    break;
   }
 }
 
 if (!submission) {
-  console.error(`No se obtuvo submit_newsletter tras ${MAX_ITERATIONS} iteraciones.`);
+  console.error("No se encontró submit_newsletter en la respuesta. Texto del modelo:");
+  console.error(res.content.find((b) => b.type === "text")?.text?.slice(0, 1000) || "(sin texto)");
   process.exit(1);
 }
 
 const elapsedSec = Math.round((Date.now() - startTime) / 1000);
-console.log(`✓ Newsletter generado en ${elapsedSec}s (${iterations} iteraciones).`);
+console.log(`✓ Newsletter generado en ${elapsedSec}s.`);
 console.log(`  Subject: ${submission.subject}`);
 console.log(`  Bullets FORMACIÓN: ${submission.formacion_bullets.length}`);
 console.log(`  Fuentes consultadas: ${submission.sources_used.length}`);
