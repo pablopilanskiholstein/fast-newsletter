@@ -122,7 +122,7 @@ const startStep1 = Date.now();
 
 const researchRes = await anthropic.messages.create({
   model: "claude-sonnet-4-6",
-  max_tokens: 4000,
+  max_tokens: 6000,
   system: [{ type: "text", text: researchSystem, cache_control: { type: "ephemeral" } }],
   tools: researchTools,
   tool_choice: { type: "any" },
@@ -144,6 +144,14 @@ for (const block of researchRes.content) {
 }
 if (!dossier) {
   console.error("Step 1: no llegó submit_research.");
+  process.exit(1);
+}
+if (researchRes.stop_reason === "max_tokens") {
+  console.error(`Step 1: salida truncada por max_tokens (output ${researchRes.usage.output_tokens}). Subir max_tokens y reintentar.`);
+  process.exit(1);
+}
+if (!Array.isArray(dossier.items) || dossier.items.length === 0) {
+  console.error("Step 1: submit_research devolvió items vacío/ausente. Dossier:", JSON.stringify(dossier).slice(0, 500));
   process.exit(1);
 }
 fs.writeFileSync("/tmp/dossier.json", JSON.stringify(dossier, null, 2));
