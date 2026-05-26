@@ -22,3 +22,12 @@ CUANDO TERMINES:
 - Llama a `submit_research` con el dossier estructurado.
 - Cada item: tópico/categoría sugerida + lista de hechos con fuente.
 - NO redactes nada editorial. Solo: títulos cortos, datos clave, urls, nombres de medio.
+
+LÍMITES DE TAMAÑO (estrictos, para no truncar la salida):
+- Máximo 5 items en `items` (no más, aunque encuentres más temas — quédate con los 5 más relevantes).
+- Máximo 1 hecho por item (`hechos` array de longitud 1).
+- `titulo_corto`: ≤ 12 palabras.
+- `dato_clave`: 1 frase, ≤ 25 palabras. SIN descripciones expansivas, contexto editorial, ni paráfrasis.
+- `fuente_nombre`: nombre corto del medio (ej. "Digital TV Europe"), no la URL.
+- `formacion`: máximo 3 oportunidades.
+- Si superás estos caps, el sistema rechaza la salida.

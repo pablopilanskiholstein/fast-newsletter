@@ -122,7 +122,7 @@ const startStep1 = Date.now();
 
 const researchRes = await anthropic.messages.create({
   model: "claude-sonnet-4-6",
-  max_tokens: 6000,
+  max_tokens: 4000,
   system: [{ type: "text", text: researchSystem, cache_control: { type: "ephemeral" } }],
   tools: researchTools,
   tool_choice: { type: "any" },
@@ -147,7 +147,7 @@ if (!dossier) {
   process.exit(1);
 }
 if (researchRes.stop_reason === "max_tokens") {
-  console.error(`Step 1: salida truncada por max_tokens (output ${researchRes.usage.output_tokens}). Subir max_tokens y reintentar.`);
+  console.error(`Step 1: salida truncada por max_tokens (output ${researchRes.usage.output_tokens}). Recortar caps del prompt research_${editionType}.txt (menos items / dato_clave más corto).`);
   process.exit(1);
 }
 if (!Array.isArray(dossier.items) || dossier.items.length === 0) {
