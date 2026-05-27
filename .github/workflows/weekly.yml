@@ -2,8 +2,10 @@ name: FAST Weekly Newsletter
 
 on:
   schedule:
-    # 07:00 UTC lunes = 09:00 Madrid (CEST) / 08:00 invierno
-    - cron: '0 7 * * 1'
+    # 06:23 UTC lunes = 08:23 Madrid (CEST) / 07:23 invierno.
+    # Minuto raro (23) fuera de hora-punta para evitar la cola de cron de GitHub
+    # Actions que delaya los jobs en horario en-punta.
+    - cron: '23 6 * * 1'
   workflow_dispatch:
 
 jobs:

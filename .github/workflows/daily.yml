@@ -2,10 +2,11 @@ name: FAST Daily Newsletter
 
 on:
   schedule:
-    # 06:00 UTC = 08:00 Madrid (CEST verano) / 07:00 invierno
-    # Cron de GitHub Actions es UTC. Si querés ajustar al horario CET/CEST exacto
-    # tendrías que duplicar el cron o aceptar que en invierno llegue a las 07:00.
-    - cron: '0 6 * * 1-5'
+    # 05:17 UTC = 07:17 Madrid (CEST verano) / 06:17 invierno.
+    # Minuto raro (17) y fuera de hora-punta (no es :00) para evitar la cola
+    # gigante de cron de GitHub Actions que delayaba este job 10-12h cuando
+    # estaba en '0 6 * * 1-5'.
+    - cron: '17 5 * * 1-5'
   workflow_dispatch:  # permite trigger manual desde la UI de Actions
 
 jobs:
