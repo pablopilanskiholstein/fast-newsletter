@@ -296,6 +296,48 @@ for (const field of requiredTop) {
   }
 }
 
+// Coerción defensiva: a veces Haiku devuelve strings donde el schema pide arrays.
+// Si pasa, partimos por líneas/separadores y limpiamos.
+function coerceToStringArray(val) {
+  if (Array.isArray(val)) return val;
+  if (typeof val === "string") {
+    return val.split(/\r?\n+/).map((s) => s.replace(/^\s*[-•*▶▷]\s*/, "").trim()).filter(Boolean);
+  }
+  return [];
+}
+function coerceToObjArray(val) {
+  if (Array.isArray(val)) return val;
+  return [];
+}
+
+if (editionType === "daily") {
+  for (const f of ["resumen_bullets", "senales_bullets"]) {
+    if (!Array.isArray(data[f])) {
+      console.warn(`⚠ ${f} llegó como ${typeof data[f]}; coercionando.`);
+      data[f] = coerceToStringArray(data[f]);
+    }
+  }
+  for (const f of ["bloques", "formacion_bullets"]) {
+    if (!Array.isArray(data[f])) {
+      console.warn(`⚠ ${f} llegó como ${typeof data[f]}; coercionando a [].`);
+      data[f] = coerceToObjArray(data[f]);
+    }
+  }
+} else {
+  for (const lang of ["es", "cat"]) {
+    if (!data[lang] || typeof data[lang] !== "object") {
+      console.error(`❌ data.${lang} no es objeto.`);
+      process.exit(1);
+    }
+    if (!Array.isArray(data[lang].senales_bullets)) {
+      data[lang].senales_bullets = coerceToStringArray(data[lang].senales_bullets);
+    }
+    if (!Array.isArray(data[lang].bloques)) {
+      data[lang].bloques = coerceToObjArray(data[lang].bloques);
+    }
+  }
+}
+
 console.log(`  Step 2 tiempo: ${Math.round((Date.now() - startStep2) / 1000)}s`);
 
 // ============================================================
