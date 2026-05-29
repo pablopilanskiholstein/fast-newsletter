@@ -9,6 +9,11 @@ on:
     # minuto raro (42) para evitar buckets en :00 :15 :30 :45. Llega antes
     # de que arranques el lunes laboral (06:42 Madrid CEST).
     - cron: '42 4 * * 1'
+    # TEMP TEST 2026-05-29: validar puntualidad del cron antes del lunes.
+    # Viernes 07:15 UTC = 09:15 Madrid. Si dispara cerca de la hora,
+    # tenemos confianza para el cron de producción del lunes. REMOVER
+    # después del test.
+    - cron: '15 7 * * 5'
   workflow_dispatch:
 
 jobs:
