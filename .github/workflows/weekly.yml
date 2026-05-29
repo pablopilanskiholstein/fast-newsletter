@@ -2,10 +2,13 @@ name: FAST Weekly Newsletter
 
 on:
   schedule:
-    # 06:23 UTC lunes = 08:23 Madrid (CEST) / 07:23 invierno.
-    # Minuto raro (23) fuera de hora-punta para evitar la cola de cron de GitHub
-    # Actions que delaya los jobs en horario en-punta.
-    - cron: '23 6 * * 1'
+    # 04:42 UTC lunes = 06:42 Madrid (CEST) / 05:42 invierno.
+    # Mismo razonamiento que daily.yml: el cambio anterior a '23 6' no
+    # esquivó el delay. La cola de cron de GitHub Actions se concentra entre
+    # 05-09 UTC (peak EU morning). Movido a 04:42 UTC, fuera del peak,
+    # minuto raro (42) para evitar buckets en :00 :15 :30 :45. Llega antes
+    # de que arranques el lunes laboral (06:42 Madrid CEST).
+    - cron: '42 4 * * 1'
   workflow_dispatch:
 
 jobs:

@@ -2,11 +2,16 @@ name: FAST Daily Newsletter
 
 on:
   schedule:
-    # 05:17 UTC = 07:17 Madrid (CEST verano) / 06:17 invierno.
-    # Minuto raro (17) y fuera de hora-punta (no es :00) para evitar la cola
-    # gigante de cron de GitHub Actions que delayaba este job 10-12h cuando
-    # estaba en '0 6 * * 1-5'.
-    - cron: '17 5 * * 1-5'
+    # 03:37 UTC = 05:37 Madrid (CEST verano) / 04:37 invierno.
+    # Evidencia 2026-05-28/29: el cambio anterior a '17 5' (05:17 UTC) no
+    # esquivó la cola — el job seguía corriendo 12h tarde. La hipótesis
+    # nueva: la cola de cron de GitHub se concentra entre 05-09 UTC (peak
+    # EU morning). Movido a 03:37 UTC (madrugada europea, ventana muerta).
+    # Minuto raro (37) para evitar el segundo bug conocido (:00 :15 :30 :45
+    # están sobre-suscriptos). Esto vive 2-3 días más hasta que se apague
+    # el daily.yml definitivo el martes 2026-06-02 — la prueba sirve para
+    # confirmar si la cola horaria es la causa real del delay.
+    - cron: '37 3 * * 1-5'
   workflow_dispatch:  # permite trigger manual desde la UI de Actions
 
 jobs:
