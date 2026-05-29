@@ -46,8 +46,16 @@ jobs:
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_FROM: ${{ secrets.GMAIL_FROM }}
         run: |
+          # SAFETY: el cron de TEST (15 7 * * 5) envía SOLO a pablo.
+          # El cron de PRODUCCIÓN del lunes (42 4 * * 1) envía a los 4.
+          # workflow_dispatch (trigger manual) envía solo a pablo por defecto seguro.
+          if [ "${{ github.event.schedule }}" = "42 4 * * 1" ]; then
+            TO="pablo.pilanski@qformedia.com,quim.campa@qformedia.com,robin.valero@qformedia.com,albert.merino@qformedia.com"
+          else
+            TO="pablo.pilanski@qformedia.com"
+          fi
           node send_newsletter.mjs \
-            --to "pablo.pilanski@qformedia.com,quim.campa@qformedia.com,robin.valero@qformedia.com,albert.merino@qformedia.com" \
+            --to "$TO" \
             --subject "$(cat /tmp/subject.txt)" \
             --html-file /tmp/body.html
 
