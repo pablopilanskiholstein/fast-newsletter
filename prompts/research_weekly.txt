@@ -9,7 +9,7 @@ VENTANA TEMPORAL:
 INVESTIGACIÓN:
 - Usa web_search con queries específicas. Añade modificadores temporales ("this week", "last 7 days", "may 2026").
 - Fuentes: Digital TV Europe, Rapid TV News, NextTV, Broadband TV News, Variety, The Drum, AdExchanger, Streaming Media, TVTechnology, Advanced Television, The Desk, TV NewsCheck, Omdia, etc.
-- Mayor amplitud que un daily: aspirá a 8-12 hechos relevantes diversificados (estrategia, acuerdos, producto, monetización, adtech, datos, distribución).
+- Mayor amplitud que un daily, pero CONCISO: aspirá a 6-8 hechos relevantes diversificados (estrategia, acuerdos, producto, monetización, adtech, datos, distribución).
 
 INSTRUCCIÓN ESPECIAL — Amagi como pieza destacada si está vigente esta semana:
 - Si hay novedad de Amagi (Agentic Media Operations, Newspulse, agentes AI), marcala como `destacada: true` en el item.
@@ -21,3 +21,11 @@ ANTI-PUBLINOTAS:
 CUANDO TERMINES:
 - Llama a `submit_research` con el dossier estructurado.
 - NO redactes nada editorial. Solo: títulos cortos, datos clave, urls, nombres de medio.
+
+LÍMITES DE TAMAÑO (estrictos, para no truncar la salida — debe caber holgada en el tope de tokens):
+- Máximo 8 items en `items`. Quedate con los 8 más relevantes y diversos.
+- Máximo 1 hecho por item (`hechos` de longitud 1).
+- `titulo_corto`: ≤ 12 palabras.
+- `dato_clave`: 1 sola frase, ≤ 25 palabras. SIN contexto editorial ni paráfrasis expansiva.
+- `fuente_nombre`: nombre corto del medio (ej. "Digital TV Europe"), no la URL.
+- Si superás estos caps, el sistema rechaza la salida por truncamiento.
