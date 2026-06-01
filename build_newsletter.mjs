@@ -257,41 +257,59 @@ ${JSON.stringify(dossier, null, 2)}
 console.log(`→ Step 2: redacción con Haiku 4.5...`);
 const startStep2 = Date.now();
 
-const writeRes = await anthropic.messages.create({
-  model: "claude-haiku-4-5",
-  // max_tokens NO cuesta plata, solo lo que se genera. Margen amplio para evitar truncamiento.
-  max_tokens: editionType === "weekly" ? 16000 : 6000,
-  system: [{ type: "text", text: writeSystem }],
-  tools: writeTools,
-  tool_choice: { type: "any" },
-  messages: [
-    { role: "user", content: "Usá el dossier del system prompt para producir el newsletter estructurado. Llamá a submit_newsletter." },
-  ],
-});
-
-console.log(`  stop_reason: ${writeRes.stop_reason}`);
-console.log(`  blocks: ${writeRes.content.map((b) => `${b.type}${b.name ? `(${b.name})` : ""}`).join(", ")}`);
-console.log(`  tokens: input ${writeRes.usage.input_tokens}, output ${writeRes.usage.output_tokens}, cache_read ${writeRes.usage.cache_read_input_tokens ?? 0}`);
-
-let data = null;
-for (const block of writeRes.content) {
-  if (block.type === "tool_use" && block.name === "submit_newsletter") {
-    data = block.input;
-    break;
-  }
-}
-if (!data) {
-  console.error("Step 2: no llegó submit_newsletter.");
-  process.exit(1);
-}
-
-// Validación defensiva
 const requiredTop = editionType === "daily"
   ? ["subject", "preheader", "headline", "resumen_bullets", "bloques", "senales_bullets", "formacion_bullets"]
   : ["subject", "preheader", "headline", "semana", "es", "cat"];
-for (const field of requiredTop) {
-  if (data[field] === undefined || data[field] === null) {
-    console.error(`❌ Campo obligatorio faltante: ${field}. stop_reason=${writeRes.stop_reason}.`);
+
+// Valida la estructura mínima necesaria para renderizar sin crashear.
+// Devuelve lista de problemas ([] = OK). Lo que se puede coercionar (arrays) NO se valida acá.
+function validateData(d) {
+  if (!d) return ["no llegó submit_newsletter"];
+  const problems = [];
+  for (const field of requiredTop) {
+    if (d[field] === undefined || d[field] === null) problems.push(`falta ${field}`);
+  }
+  if (editionType === "weekly") {
+    for (const lang of ["es", "cat"]) {
+      const b = d[lang];
+      if (!b || typeof b !== "object" || Array.isArray(b)) problems.push(`${lang} no es objeto`);
+      else if (!Array.isArray(b.bloques)) problems.push(`${lang}.bloques no es array`);
+    }
+  }
+  return problems;
+}
+
+// Retry: Haiku a veces devuelve es/cat malformado (sobre todo cat en weekly).
+// El fallo es intermitente, así que reintentar suele resolverlo sin mandar un mail roto.
+let data = null;
+let writeRes = null;
+const MAX_TRIES = 3;
+const userMsg = editionType === "weekly"
+  ? "Usá el dossier del system prompt para producir el newsletter estructurado. Llamá a submit_newsletter. OBLIGATORIO: 'es' y 'cat' deben ser objetos completos, cada uno con resumen, destacada, bloques y senales_bullets. 'cat' es la traducción fiel al catalán de 'es' — nunca lo omitas ni lo dejes vacío."
+  : "Usá el dossier del system prompt para producir el newsletter estructurado. Llamá a submit_newsletter.";
+
+for (let attempt = 1; attempt <= MAX_TRIES; attempt++) {
+  writeRes = await anthropic.messages.create({
+    model: "claude-haiku-4-5",
+    // max_tokens NO cuesta plata, solo lo que se genera. Margen amplio para evitar truncamiento.
+    max_tokens: editionType === "weekly" ? 16000 : 6000,
+    system: [{ type: "text", text: writeSystem }],
+    tools: writeTools,
+    tool_choice: { type: "any" },
+    messages: [{ role: "user", content: userMsg }],
+  });
+  console.log(`  intento ${attempt}/${MAX_TRIES} — stop_reason: ${writeRes.stop_reason}, tokens: in ${writeRes.usage.input_tokens}, out ${writeRes.usage.output_tokens}, cache_read ${writeRes.usage.cache_read_input_tokens ?? 0}`);
+
+  data = null;
+  for (const block of writeRes.content) {
+    if (block.type === "tool_use" && block.name === "submit_newsletter") { data = block.input; break; }
+  }
+
+  const problems = validateData(data);
+  if (problems.length === 0) break;
+  console.warn(`  ⚠ intento ${attempt} inválido: ${problems.join("; ")}`);
+  if (attempt === MAX_TRIES) {
+    console.error(`❌ Step 2 falló tras ${MAX_TRIES} intentos: ${problems.join("; ")}`);
     process.exit(1);
   }
 }
@@ -324,11 +342,8 @@ if (editionType === "daily") {
     }
   }
 } else {
+  // es/cat ya validados como objetos con bloques array por validateData/retry.
   for (const lang of ["es", "cat"]) {
-    if (!data[lang] || typeof data[lang] !== "object") {
-      console.error(`❌ data.${lang} no es objeto.`);
-      process.exit(1);
-    }
     if (!Array.isArray(data[lang].senales_bullets)) {
       data[lang].senales_bullets = coerceToStringArray(data[lang].senales_bullets);
     }

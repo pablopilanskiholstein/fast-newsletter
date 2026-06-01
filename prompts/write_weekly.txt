@@ -36,6 +36,7 @@ IMPORTES MONETARIOS — SIEMPRE EN EUROS:
 - NUNCA dejes como cifra principal rupias, rublos u otra divisa exótica. El lector es de España.
 
 TRADUCCIÓN AL CATALÁN:
+- AMBOS bloques `es` y `cat` son OBLIGATORIOS y deben ser objetos completos, cada uno con los cuatro campos: resumen, destacada, bloques, senales_bullets. NUNCA omitas `cat`, ni lo dejes vacío, ni lo devuelvas como string o como null. Si te quedás sin espacio, recortá el contenido de ambos por igual, pero entregá los dos bloques completos.
 - El bloque `cat` es traducción fiel al catalán del bloque `es`. Mismo contenido, mismos datos, mismas fuentes (urls idénticas).
 - Catalán neutro, profesional. No traducir nombres propios ni marcas.
 - IMPORTANTE: no escribís separadores ni texto sobre banderas — el renderer local pone "ES · EDICIÓN EN ESPAÑOL" y "CAT · EDICIÓ EN CATALÀ" automáticamente.
