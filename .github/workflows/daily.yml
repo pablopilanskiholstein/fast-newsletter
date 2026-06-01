@@ -1,18 +1,14 @@
 name: FAST Daily Newsletter
 
 on:
-  schedule:
-    # 03:37 UTC = 05:37 Madrid (CEST verano) / 04:37 invierno.
-    # Evidencia 2026-05-28/29: el cambio anterior a '17 5' (05:17 UTC) no
-    # esquivó la cola — el job seguía corriendo 12h tarde. La hipótesis
-    # nueva: la cola de cron de GitHub se concentra entre 05-09 UTC (peak
-    # EU morning). Movido a 03:37 UTC (madrugada europea, ventana muerta).
-    # Minuto raro (37) para evitar el segundo bug conocido (:00 :15 :30 :45
-    # están sobre-suscriptos). Esto vive 2-3 días más hasta que se apague
-    # el daily.yml definitivo el martes 2026-06-02 — la prueba sirve para
-    # confirmar si la cola horaria es la causa real del delay.
-    - cron: '37 3 * * 1-5'
-  workflow_dispatch:  # permite trigger manual desde la UI de Actions
+  # CRON DEL DAILY APAGADO el 2026-06-01.
+  # El daily se migró a Google Workspace Studio (Gemini, gratis), que dispara
+  # puntual lun-vie 08:00 Madrid. Este workflow de GitHub Actions ya no se
+  # usa para el daily — se deja solo con workflow_dispatch por si hace falta
+  # un disparo manual de emergencia (usa la API de Anthropic, ~$0.10/run).
+  # schedule:
+  #   - cron: '37 3 * * 1-5'
+  workflow_dispatch:  # solo trigger manual; el daily de producción vive en Workspace Studio
 
 jobs:
   send:
