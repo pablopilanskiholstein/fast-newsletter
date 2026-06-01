@@ -1,20 +1,25 @@
 name: FAST Weekly Newsletter
 
 on:
-  schedule:
-    # 04:42 UTC lunes = 06:42 Madrid (CEST) / 05:42 invierno.
-    # Mismo razonamiento que daily.yml: el cambio anterior a '23 6' no
-    # esquivó el delay. La cola de cron de GitHub Actions se concentra entre
-    # 05-09 UTC (peak EU morning). Movido a 04:42 UTC, fuera del peak,
-    # minuto raro (42) para evitar buckets en :00 :15 :30 :45. Llega antes
-    # de que arranques el lunes laboral (06:42 Madrid CEST).
-    - cron: '42 4 * * 1'
-    # TEMP TEST 2026-05-29: validar puntualidad del cron antes del lunes.
-    # Viernes 07:15 UTC = 09:15 Madrid. Si dispara cerca de la hora,
-    # tenemos confianza para el cron de producción del lunes. REMOVER
-    # después del test.
-    - cron: '15 7 * * 5'
+  # CRON NATIVO DESHABILITADO 2026-06-01.
+  # Motivo: GitHub Actions disparaba el schedule 9-12h tarde de forma
+  # consistente (best-effort, sin SLA — confirmado en docs oficiales de
+  # GitHub y medido en este repo). Inservible para un mail puntual a jefes.
+  # El disparo puntual se hace ahora vía SCHEDULER EXTERNO (cron-job.org /
+  # GCP / n8n) que llama a workflow_dispatch con audience=full a la hora
+  # exacta. Si el scheduler externo aún no está configurado, NO hay disparo
+  # automático: hay que reactivar este cron o disparar a mano.
+  # schedule:
+  #   - cron: '42 4 * * 1'
   workflow_dispatch:
+    inputs:
+      audience:
+        description: "Destinatarios: 'full' = los 4 (producción), 'solo' = solo pablo (test)"
+        type: choice
+        options:
+          - solo
+          - full
+        default: solo
 
 jobs:
   send:
@@ -46,10 +51,11 @@ jobs:
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_FROM: ${{ secrets.GMAIL_FROM }}
         run: |
-          # SAFETY: el cron de TEST (15 7 * * 5) envía SOLO a pablo.
-          # El cron de PRODUCCIÓN del lunes (42 4 * * 1) envía a los 4.
-          # workflow_dispatch (trigger manual) envía solo a pablo por defecto seguro.
-          if [ "${{ github.event.schedule }}" = "42 4 * * 1" ]; then
+          # Destinatarios según el input 'audience' del workflow_dispatch.
+          #   full         -> los 4 (producción: pablo, quim, robin, albert)
+          #   solo / vacío -> solo pablo (default seguro; test y disparos sin especificar)
+          # Un scheduler externo dispara con audience=full para la producción semanal.
+          if [ "${{ github.event.inputs.audience }}" = "full" ]; then
             TO="pablo.pilanski@qformedia.com,quim.campa@qformedia.com,robin.valero@qformedia.com,albert.merino@qformedia.com"
           else
             TO="pablo.pilanski@qformedia.com"
