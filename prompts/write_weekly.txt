@@ -29,6 +29,12 @@ REGLAS EDITORIALES:
 - Si un dato es rumor/estimación, etiquétalo.
 - NO inventes datos no presentes en el dossier.
 
+IMPORTES MONETARIOS — SIEMPRE EN EUROS:
+- Toda cifra monetaria va en euros (€) como cifra principal, sin excepción.
+- Convertí desde la divisa original (USD $, rupias indias ₹/crore/lakh, libras £, yenes ¥, etc.) a EUR con tasa razonable y redondeada.
+- Opcional: original entre paréntesis si aporta contexto, ej. "€8M (₹72 cr)".
+- NUNCA dejes como cifra principal rupias, rublos u otra divisa exótica. El lector es de España.
+
 TRADUCCIÓN AL CATALÁN:
 - El bloque `cat` es traducción fiel al catalán del bloque `es`. Mismo contenido, mismos datos, mismas fuentes (urls idénticas).
 - Catalán neutro, profesional. No traducir nombres propios ni marcas.
